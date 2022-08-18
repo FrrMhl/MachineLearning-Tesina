@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.ensemble import StackingClassifier
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
@@ -66,7 +67,6 @@ if __name__ == '__main__':
     bestFeature = feature[sfs.get_support()]
     print(bestFeature)
     sfs.transform(X_Stand)
-
     X_train, X_test, y_train, y_test = train_test_split(X_Stand, y, test_size=0.3, shuffle=True)
 
     ####################################################################################
@@ -85,8 +85,6 @@ if __name__ == '__main__':
     treeModel = tree.DecisionTreeClassifier(max_depth=10)
     treeModel.fit(X_train, y_train)
     previsioni.append(treeModel.predict(X_test))
-    plt.figure()
-    tree.plot_tree(treeModel)
 
     model.append('K-NN')
     knnModel = KNeighborsClassifier(n_neighbors=5)
@@ -97,9 +95,11 @@ if __name__ == '__main__':
     #                          RISULTATI SENZA GRID SEARCH                             #
     ####################################################################################
 
+    accuracy = []
     for i in range(len(model)):
         print('\n\n\n------------------------      Risultati {}     ------------------------'.format(model[i]))
         print('Accuracy is {}%'.format(round(accuracy_score(y_test, previsioni[i])*100, 2)))
+        accuracy.append(round(accuracy_score(y_test, previsioni[i])*100, 2))
         print('Precision is {}%'.format(round(precision_score(y_test, previsioni[i], average='weighted')*100, 2)))
         print('Recall is {}%'.format(round(recall_score(y_test, previsioni[i], average='weighted')*100, 2)))
         print('F1-Score is {}%'.format(round(f1_score(y_test, previsioni[i], average='weighted')*100, 2)))
@@ -150,6 +150,7 @@ if __name__ == '__main__':
     best = 0
     index = -1
     for i in range(len(model)):
+        accuracy.append(round(accuracy_score(y_test, previsioni[i+3]) * 100, 2))
         if round(accuracy_score(y_test, previsioni[i+3]) * 100, 2) > best:
             best = round(accuracy_score(y_test, previsioni[i+3]) * 100, 2)
             index = i
@@ -167,20 +168,46 @@ if __name__ == '__main__':
     print('\n\n\n------------------------      Valutazione con Ensamble     ------------------------')
     estimators = [
         ('lg', LogisticRegression(solver=logistRegrModelCV.best_params_.get('solver'))),
-        ('dt', tree.DecisionTreeClassifier(criterion=treeModelCV.best_params_.get('criteron'),
+        ('dt', tree.DecisionTreeClassifier(criterion=treeModelCV.best_params_.get('criterion'),
                                            max_depth=treeModelCV.best_params_.get('max_depth'))),
         ('knn', KNeighborsClassifier(n_neighbors=knnModelCV.best_params_.get('n_neighbors')))
     ]
     modelloUnico = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression(), cv=5)
     modelloUnico.fit(X_train, y_train)
-    accuracy = round(modelloUnico.score(X_test, y_test) * 100, 2)
-    print('\nAccuracy con ensamble -> {}%'.format(accuracy))
+    accuracyEnsamble = round(modelloUnico.score(X_test, y_test) * 100, 2)
+    print('\nAccuracy con ensamble -> {}%'.format(accuracyEnsamble))
 
-    if accuracy > best:
-        print('\nCon lo Stacking Ensamble abbiamo una valutazione migliore')
+    if accuracyEnsamble > best:
+        print('Con lo Stacking Ensamble abbiamo una valutazione migliore')
     else:
         print('La soluzione migliore rimane {}'.format(model[i]))
 
-    #plt.show()
+    ####################################################################################
+    #                                  GRAFICI                                         #
+    ####################################################################################
 
-    # TODO fare grafici
+    barWidth = 0.25
+    fig = plt.subplots(figsize=(12, 8))
+
+    lr = [accuracy[0], accuracy[3]]
+    dt = [accuracy[1], accuracy[4]]
+    knn = [accuracy[2], accuracy[5]]
+
+    br1 = np.arange(2)
+    br2 = [x + barWidth for x in br1]
+    br3 = [x + barWidth for x in br2]
+
+    plt.bar(br1, lr, color='r', width=barWidth,
+            edgecolor='grey', label='LR')
+    plt.bar(br2, dt, color='g', width=barWidth,
+            edgecolor='grey', label='DT')
+    plt.bar(br3, knn, color='b', width=barWidth,
+            edgecolor='grey', label='K-NN')
+
+    plt.xlabel('Grid Search', fontweight='bold', fontsize=15)
+    plt.ylabel('Accuracy', fontweight='bold', fontsize=15)
+    plt.xticks([r + barWidth for r in range(2)],
+               ['Before', 'After'])
+
+    plt.legend()
+    plt.show()
