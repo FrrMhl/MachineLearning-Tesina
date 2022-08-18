@@ -1,5 +1,6 @@
 import pandas as pd
 from matplotlib import pyplot as plt
+from sklearn.ensemble import StackingClassifier
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -163,8 +164,23 @@ if __name__ == '__main__':
     #                                   ENSAMBLE                                       #
     ####################################################################################
 
+    print('\n\n\n------------------------      Valutazione con Ensamble     ------------------------')
+    estimators = [
+        ('lg', LogisticRegression(solver=logistRegrModelCV.best_params_.get('solver'))),
+        ('dt', tree.DecisionTreeClassifier(criterion=treeModelCV.best_params_.get('criteron'),
+                                           max_depth=treeModelCV.best_params_.get('max_depth'))),
+        ('knn', KNeighborsClassifier(n_neighbors=knnModelCV.best_params_.get('n_neighbors')))
+    ]
+    modelloUnico = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression(), cv=5)
+    modelloUnico.fit(X_train, y_train)
+    accuracy = round(modelloUnico.score(X_test, y_test) * 100, 2)
+    print('\nAccuracy con ensamble -> {}%'.format(accuracy))
 
+    if accuracy > best:
+        print('\nCon lo Stacking Ensamble abbiamo una valutazione migliore')
+    else:
+        print('La soluzione migliore rimane {}'.format(model[i]))
 
     #plt.show()
 
-    # TODO fare grafici, ensamble se mi va
+    # TODO fare grafici
