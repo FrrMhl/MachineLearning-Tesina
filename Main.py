@@ -60,7 +60,7 @@ if __name__ == '__main__':
     print(X_Stand)
 
     estimator = LogisticRegression()
-    sfs = SequentialFeatureSelector(estimator, n_features_to_select='auto')
+    sfs = SequentialFeatureSelector(estimator, n_features_to_select='auto', tol=0.01)
     sfs.fit(X_Stand, y)
     print('\n\n\n------------------------      Feature selezionate      ------------------------')
     feature = df.columns.drop('class')
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     previsioni = []
 
     model.append('Logistic Regression')
-    logistRegrModel = LogisticRegression(class_weight='balanced', multi_class='multinomial', solver='saga')
+    logistRegrModel = LogisticRegression(class_weight='balanced')
     logistRegrModel.fit(X_train, y_train)
     previsioni.append(logistRegrModel.predict(X_test))
 
@@ -109,16 +109,16 @@ if __name__ == '__main__':
     ####################################################################################
 
     gridLR = {
-        'solver': ['saga', 'newton-cg', 'lbfgs', 'sag']
+        'solver': ['saga', 'newton-cg', 'lbfgs', 'sag', 'liblinear']
     }
-    logistRegrModelCV = GridSearchCV(estimator=LogisticRegression(),
+    logistRegrModelCV = GridSearchCV(estimator=LogisticRegression(class_weight='balanced'),
                                      param_grid=gridLR,
                                      cv=5)
     logistRegrModelCV.fit(X_train, y_train)
 
     gridT = {
         'criterion': ['gini', 'entropy', 'log_loss'],
-        'max_depth': [8, 10, 12],
+        'max_depth': [10, 15, 20],
     }
     treeModelCV = GridSearchCV(estimator=tree.DecisionTreeClassifier(),
                                param_grid=gridT,
@@ -126,7 +126,7 @@ if __name__ == '__main__':
     treeModelCV.fit(X_train, y_train)
 
     gridKNN = {
-        'n_neighbors': [3, 5, 7, 11]
+        'n_neighbors': [1, 3, 5]
     }
     knnModelCV = GridSearchCV(estimator=KNeighborsClassifier(),
                               param_grid=gridKNN,
@@ -155,11 +155,11 @@ if __name__ == '__main__':
             best = round(accuracy_score(y_test, previsioni[i+3]) * 100, 2)
             index = i
 
-    print(model[i])
-    print('Accuracy is {}%'.format(round(accuracy_score(y_test, previsioni[i+3]) * 100, 2)))
-    print('Precision is {}%'.format(round(precision_score(y_test, previsioni[i+3], average='weighted') * 100, 2)))
-    print('Recall is {}%'.format(round(recall_score(y_test, previsioni[i+3], average='weighted') * 100, 2)))
-    print('F1-Score is {}%'.format(round(f1_score(y_test, previsioni[i+3], average='weighted') * 100, 2)))
+    print(model[index])
+    print('Accuracy is {}%'.format(round(accuracy_score(y_test, previsioni[index+3]) * 100, 2)))
+    print('Precision is {}%'.format(round(precision_score(y_test, previsioni[index+3], average='weighted') * 100, 2)))
+    print('Recall is {}%'.format(round(recall_score(y_test, previsioni[index+3], average='weighted') * 100, 2)))
+    print('F1-Score is {}%'.format(round(f1_score(y_test, previsioni[index+3], average='weighted') * 100, 2)))
 
     ####################################################################################
     #                                   ENSAMBLE                                       #
@@ -167,12 +167,15 @@ if __name__ == '__main__':
 
     print('\n\n\n------------------------      Valutazione con Ensamble     ------------------------')
     estimators = [
-        ('lg', LogisticRegression(solver=logistRegrModelCV.best_params_.get('solver'))),
+        ('lg', LogisticRegression(solver=logistRegrModelCV.best_params_.get('solver'),
+                                  class_weight='balanced')),
         ('dt', tree.DecisionTreeClassifier(criterion=treeModelCV.best_params_.get('criterion'),
                                            max_depth=treeModelCV.best_params_.get('max_depth'))),
         ('knn', KNeighborsClassifier(n_neighbors=knnModelCV.best_params_.get('n_neighbors')))
     ]
-    modelloUnico = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression(), cv=5)
+    modelloUnico = StackingClassifier(estimators=estimators,
+                                      final_estimator=LogisticRegression(),
+                                      cv=5)
     modelloUnico.fit(X_train, y_train)
     accuracyEnsamble = round(modelloUnico.score(X_test, y_test) * 100, 2)
     print('\nAccuracy con ensamble -> {}%'.format(accuracyEnsamble))
@@ -180,15 +183,20 @@ if __name__ == '__main__':
     if accuracyEnsamble > best:
         print('Con lo Stacking Ensamble abbiamo una valutazione migliore')
     else:
-        print('La soluzione migliore rimane {}'.format(model[i]))
+        print('La soluzione migliore rimane {}'.format(model[index]))
 
     ####################################################################################
     #                                  GRAFICI                                         #
     ####################################################################################
 
-    barWidth = 0.25
-    fig = plt.subplots(figsize=(12, 8))
+    nRighe, nCol = df.shape
+    classi = ['Velenoso', 'Commestibile']
+    conteggio = df['class'].value_counts()
+    percentuali = [conteggio.iloc[0] / nCol * 100, conteggio.iloc[1] / nCol * 100]
+    plt.pie(x=percentuali, labels=classi, autopct='%1.1f%%', startangle=90)
 
+    plt.figure()
+    barWidth = 0.25
     lr = [accuracy[0], accuracy[3]]
     dt = [accuracy[1], accuracy[4]]
     knn = [accuracy[2], accuracy[5]]
@@ -197,17 +205,20 @@ if __name__ == '__main__':
     br2 = [x + barWidth for x in br1]
     br3 = [x + barWidth for x in br2]
 
-    plt.bar(br1, lr, color='r', width=barWidth,
-            edgecolor='grey', label='LR')
-    plt.bar(br2, dt, color='g', width=barWidth,
-            edgecolor='grey', label='DT')
-    plt.bar(br3, knn, color='b', width=barWidth,
-            edgecolor='grey', label='K-NN')
+    plt.bar(br1, lr, color='r', width=barWidth, edgecolor='grey', label='LR')
+    plt.bar(br2, dt, color='g', width=barWidth, edgecolor='grey', label='DT')
+    plt.bar(br3, knn, color='b', width=barWidth, edgecolor='grey', label='K-NN')
 
-    plt.xlabel('Grid Search', fontweight='bold', fontsize=15)
+    for i in range(2):
+        plt.text(br1[i], lr[i], lr[i], ha='center', bbox=dict(facecolor='pink', alpha=0.8))
+        plt.text(br2[i], dt[i], dt[i], ha='center', bbox=dict(facecolor='pink', alpha=0.8))
+        plt.text(br3[i], knn[i], knn[i], ha='center', bbox=dict(facecolor='pink', alpha=0.8))
+
+    plt.xlabel('Time', fontweight='bold', fontsize=15)
     plt.ylabel('Accuracy', fontweight='bold', fontsize=15)
-    plt.xticks([r + barWidth for r in range(2)],
-               ['Before', 'After'])
+    plt.xticks([r + barWidth for r in range(2)], ['Before', 'After'])
+    plt.title('Accuracy prima e dopo grid search')
 
     plt.legend()
+
     plt.show()
