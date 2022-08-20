@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+import seaborn as sns
 from sklearn.ensemble import StackingClassifier
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.linear_model import LogisticRegression
@@ -194,6 +195,10 @@ if __name__ == '__main__':
     conteggio = df['class'].value_counts()
     percentuali = [conteggio.iloc[0] / nCol * 100, conteggio.iloc[1] / nCol * 100]
     plt.pie(x=percentuali, labels=classi, autopct='%1.1f%%', startangle=90)
+
+    subset = bestFeature.tolist()
+    subset.append('class')
+    sns.pairplot(df[subset], hue='class')
 
     plt.figure()
     barWidth = 0.25
